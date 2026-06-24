@@ -6,7 +6,7 @@ const lastSessions = {};
 const userSubscriptions = {};
 
 // ==================== [ 🛑 CẤU HÌNH HỆ THỐNG ] ====================
-const BOT_TOKEN = '8722833362:AAFfeFYj1zc_qbUqdaRbCju1zX8KtLT8OTI';
+const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = 7338417401; 
 // ==================================================================
 
