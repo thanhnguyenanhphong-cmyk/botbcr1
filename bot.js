@@ -300,11 +300,30 @@ bot.start((ctx) => {
 
 // --- ⚡ XỬ LÝ SỰ KIỆN BẤM BÀN PHÍM DƯỚI CHAT ---
 bot.hears(BTN_GAME, async (ctx) => {
+
+    const user = getUser(ctx.from.id);
+
+    const isVip =
+        user.is_vip &&
+        (
+            user.vip_until === 'permanent' ||
+            user.vip_until > Date.now()
+        );
+
+    if (!isVip) {
+        return ctx.reply(
+            '🔒 Bạn cần mua VIP để sử dụng chức năng CHỌN GAME!'
+        );
+    }
+
     let text = formatHeader('🎮 DANH SÁCH GAME 🎮') +
            `Vui lòng chọn bàn bạn muốn cài đặt Tool:\n` +
            `• 👑 Yêu cầu cấp bậc: **VIP PRO**` +
            formatFooter();
-    await ctx.replyWithMarkdown(text, { reply_markup: tableMarkup() });
+
+    await ctx.replyWithMarkdown(text, {
+        reply_markup: tableMarkup()
+    });
 });
 
 bot.hears(BTN_NAP, async (ctx) => {
