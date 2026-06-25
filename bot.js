@@ -407,7 +407,7 @@ if (isVip) {
         const axios = require('axios');
 
         const res = await axios.get(
-            'https://api-dudoansexy-2.onrender.com/dudoan/sexy/all'
+            'https://apibcrneww.onrender.com/dudoan/sexy/all'
         );
 
 const dataArray = Array.isArray(res.data)
