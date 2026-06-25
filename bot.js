@@ -441,7 +441,7 @@ bot.launch().then(() => {
 });
 
 // ===== EXPRESS WEB TRẢ PORT ĐỂ RENDER KHÔNG CRASH =====
-const express = require('express');
+// Không khai báo lại const express nữa để tránh lỗi trùng lặp Identifier
 const app = express();
 
 app.get('/', (req, res) => {
