@@ -411,7 +411,6 @@ let billNotify = `🔔 THÔNG BÁO GIAO DỊCH 🔔\n` +
 if (data.startsWith('table_')) {
 const tableName = data.replace('table_', '').toUpperCase();
 
-userSubscriptions[userId] = tableName;
 const user = getUser(userId);
 
 const isVip =
@@ -422,6 +421,9 @@ const isVip =
     );
 
 if (isVip) {
+
+    userSubscriptions[userId] = tableName;
+
     try {
         const axios = require('axios');
 
