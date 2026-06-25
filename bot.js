@@ -2,15 +2,15 @@ const { Telegraf, Scenes, session, Markup } = require('telegraf');
 const axios = require('axios');
 const express = require('express');
 
-// --- ⚙️ CẤU HÌNH BIẾN MÔI TRƯỜNG ---
-// Thay thế dòng cũ bằng dòng này, xóa hẳn chuỗi token lộ ra ngoài
-const BOT_TOKEN = process.env.BOT_TOKEN; 
+// --- ⚙️ CẤU HÌNH BIẾN MÔI TRƯỜNG BẢO MẬT ---
+// Không viết trực tiếp token vào đây để tránh bị lộ. Hãy điền trên Dashboard của Render!
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_ID = parseInt(process.env.ADMIN_ID || '7338417401'); // Thay bằng ID Admin thật của bạn
 
 if (!BOT_TOKEN) {
     console.error('❌ LỖI NGHIÊM TRỌNG: Chưa cấu hình biến môi trường BOT_TOKEN trên Render!');
-    process.exit(1); // Dừng bot nếu thiếu token để tránh lỗi crash hệ thống
+    process.exit(1);
 }
-const ADMIN_ID = parseInt(process.env.ADMIN_ID || '7338417401'); // Thay bằng ID Telegram của bạn
 
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -25,18 +25,17 @@ const BTN_NAP = '💳 NẠP TIỀN';
 const BTN_VIP = '👑 MUA VIP';
 const BTN_USER = '👤 TÀI KHOẢN';
 
-// --- 🛠️ CÁC HÀM KẾT NỐI DATABASE (HÃY ĐỒNG BỘ VỚI FILE DB.JSON CỦA BẠN) ---
+// --- 🛠️ CÁC HÀM KẾT NỐI DATABASE (BẠN ĐỒNG BỘ VỚI FILE DB.JSON CỦA BẠN) ---
 function getUser(userId, name = 'Khách') {
     // Mẫu dữ liệu user, hãy chỉnh sửa để đọc ghi từ db.json thực tế của bạn
     return { balance: 100000, is_vip: true, vip_until: Date.now() + 86400000 }; 
 }
 function updateUserBalance(userId, amount) { return 100000; }
 function addVipTime(userId, days) {}
-function loadDB() { return {}; } // Hàm load database cũ của bạn
 function checkVipStatus(userId) {
     const u = getUser(userId);
     const isVip = u && u.is_vip && (u.vip_until === 'permanent' || u.vip_until > Date.now());
-    return { isVip, text: isVip ? '👑 VIP PRO' : 'Chưa đăng ký' };
+    return { isVip, text: isVip ? '<b>👑 VIP PRO</b>' : 'Chưa đăng ký' };
 }
 function getVipStatusText(u) {
     if (!u.is_vip) return 'Chưa đăng ký';
@@ -44,8 +43,8 @@ function getVipStatusText(u) {
     return u.vip_until > Date.now() ? 'Đang kích hoạt' : 'Hết hạn';
 }
 
-// Cấu hình giao diện mẫu text bo góc
-function formatHeader(title) { return `🌟 **${title}** 🌟\n━━━━━━━━━━━━━━━━━━\n`; }
+// Cấu hình giao diện mẫu text dạng HTML để CHỐNG SẬP BOT
+function formatHeader(title) { return `🌟 <b>${title}</b> 🌟\n━━━━━━━━━━━━━━━━━━\n`; }
 function formatFooter() { return `\n━━━━━━━━━━━━━━━━━━\n👑 @Toolbcrpro_bot`; }
 function mainReplyMarkup() { return Markup.keyboard([[BTN_GAME, BTN_NAP], [BTN_VIP, BTN_USER]]).resize(); }
 
@@ -73,7 +72,7 @@ bot.use(async (ctx, next) => {
     if (!ctx.from) return next();
     if (blockedUsers.has(ctx.from.id)) {
         if (ctx.chat.type === 'private') {
-            await ctx.reply('🔒 **Tài khoản của bạn đã bị Admin khóa khỏi hệ thống bot.**').catch(() => {});
+            await ctx.reply('🔒 <b>Tài khoản của bạn đã bị Admin khóa khỏi hệ thống bot.</b>', { parse_mode: 'HTML' }).catch(() => {});
         }
         return; 
     }
@@ -84,13 +83,13 @@ bot.use(async (ctx, next) => {
 bot.command('chan', async (ctx) => {
     if (ctx.from.id !== ADMIN_ID) return ctx.reply('❌ Bạn không phải Admin!');
     const args = ctx.message.text.split(' ');
-    if (args.length < 2) return ctx.replyWithMarkdown('⚠️ Cú pháp chặn:\n• Theo ID số: `/chan 12345678`\n• Theo Username: `/chan @phong296`');
+    if (args.length < 2) return ctx.replyWithHTML('⚠️ Cú pháp chặn:\n• Theo ID số: <code>/chan 12345678</code>\n• Theo Username: <code>/chan @phong296</code>');
 
     const target = args[1].trim();
 
     if (target.startsWith('@')) {
         const usernameToBlock = target.replace('@', '').toLowerCase();
-        ctx.reply(`✅ Đã đưa cấu hình tài khoản \`@${usernameToBlock}\` vào danh sách cấm tự động.`);
+        ctx.replyWithHTML(`✅ Đã đưa cấu hình tài khoản <code>@${usernameToBlock}</code> vào danh sách cấm tự động.`);
         bot.use(async (context, next) => {
             if (context.from && context.from.username && context.from.username.toLowerCase() === usernameToBlock) {
                 blockedUsers.add(context.from.id);
@@ -107,9 +106,9 @@ bot.command('chan', async (ctx) => {
 
     blockedUsers.add(targetUserId);
     delete userSubscriptions[targetUserId];
-    await ctx.reply(`✅ Đã cấm thành công ID người dùng: \`${targetUserId}\`.`);
+    await ctx.replyWithHTML(`✅ Đã cấm thành công ID người dùng: <code>${targetUserId}</code>.`);
     try { 
-        await ctx.telegram.sendMessage(targetUserId, '🔒 **Tài khoản của bạn đã bị Admin chặn khỏi hệ thống!**'); 
+        await ctx.telegram.sendMessage(targetUserId, '🔒 <b>Tài khoản của bạn đã bị Admin chặn khỏi hệ thống!</b>', { parse_mode: 'HTML' }); 
     } catch (e) {}
 });
 
@@ -124,7 +123,7 @@ const napTienWizard = new Scenes.WizardScene(
     },
     async (ctx) => {
         if (!ctx.message || !ctx.message.photo) {
-            await ctx.reply('⚠️ Vui lòng nhấn nút [🟢 ĐÃ CHUYỂN KHOẢN] hoặc gửi ảnh bill để tiếp tục.');
+            await ctx.reply('⚠️ Vui lòng gửi ảnh bill chuyển khoản để tiếp tục.');
             return;
         }
 
@@ -133,7 +132,7 @@ const napTienWizard = new Scenes.WizardScene(
         const sotien = ctx.wizard.state.sotien;
         const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
         const noidung = ctx.wizard.state.noidung;
-        await ctx.replyWithMarkdown(`✅ **Đã gửi hóa đơn!** Vui lòng đợi 1-3 phút để Admin duyệt tiền.`, { reply_markup: mainReplyMarkup() });
+        await ctx.replyWithHTML(`✅ <b>Đã gửi hóa đơn!</b> Vui lòng đợi 1-3 phút để Admin duyệt tiền.`, { reply_markup: mainReplyMarkup() });
 
         try {
             const adminButtons = Markup.inlineKeyboard([
@@ -141,8 +140,8 @@ const napTienWizard = new Scenes.WizardScene(
             ]).reply_markup;
 
             await ctx.telegram.sendPhoto(ADMIN_ID, fileId, {
-                caption: `🚨 **BILL NẠP TIỀN MỚI** 🚨\n• Khách: ${name}\n• ID: \`${userId}\`\n• Số tiền: **${sotien.toLocaleString('vi-VN')}đ**\n• Nội dung CK: \`${noidung}\``,
-                parse_mode: 'Markdown',
+                caption: `🚨 <b>BILL NẠP TIỀN MỚI</b> 🚨\n• Khách: ${name}\n• ID: <code>${userId}</code>\n• Số tiền: <b>${sotien.toLocaleString('vi-VN')}đ</b>\n• Nội dung CK: <code>${noidung}</code>`,
+                parse_mode: 'HTML',
                 reply_markup: adminButtons
             });
         } catch (error) { console.error(error); }
@@ -151,12 +150,6 @@ const napTienWizard = new Scenes.WizardScene(
 );
 
 const stage = new Scenes.Stage([napTienWizard]);
-stage.action('cancel_nap', async (ctx) => {
-    await ctx.answerCbQuery('❌ Hủy nạp tiền.');
-    await ctx.scene.leave();
-    await ctx.replyWithMarkdown(`🔥 **Đã hủy giao dịch.** Vui lòng chọn chức năng bên dưới:`, { reply_markup: mainReplyMarkup() });
-});
-
 bot.use(session());
 bot.use(stage.middleware());
 
@@ -165,13 +158,13 @@ bot.start((ctx) => {
     const name = ctx.from.first_name || 'Khách';
     const u = getUser(ctx.from.id, name);
     let text = formatHeader('👋 MENU CHÍNH 👋') +
-               `Chào mừng **${name}**!\n` +
-               `• 👤 Khách hàng: **${name}**\n` +
-               `• 💰 Số dư ví: \`${u.balance.toLocaleString('vi-VN')}đ\`\n` +
+               `Chào mừng <b>${name}</b>!\n` +
+               `• 👤 Khách hàng: <b>${name}</b>\n` +
+               `• 💰 Số dư ví: <code>${u.balance.toLocaleString('vi-VN')}đ</code>\n` +
                `• 👑 Kích Hoạt: ${getVipStatusText(u)}\n\n` +
                `Chọn chức năng dưới bàn phím để bắt đầu:` +
                formatFooter();
-    ctx.replyWithMarkdown(text, { reply_markup: mainReplyMarkup() });
+    ctx.replyWithHTML(text, { reply_markup: mainReplyMarkup() }).catch((e) => console.error(e));
 });
 
 // --- ⚡ XỬ LÝ SỰ KIỆN PHÍM BẤM BÀN PHÍM MENU GỐC ---
@@ -186,10 +179,10 @@ bot.hears(BTN_GAME, async (ctx) => {
 
     let text = formatHeader('🎮 DANH SÁCH GAME 🎮') +
            `Vui lòng chọn bàn bạn muốn cài đặt Tool:\n` +
-           `• 👑 Yêu cầu cấp bậc: **VIP PRO**` +
+           `• 👑 Yêu cầu cấp bậc: <b>VIP PRO</b>` +
            formatFooter();
 
-    await ctx.replyWithMarkdown(text, { reply_markup: tableMarkup() });
+    await ctx.replyWithHTML(text, { reply_markup: tableMarkup() });
 });
 
 bot.hears(BTN_NAP, async (ctx) => {
@@ -199,12 +192,12 @@ bot.hears(BTN_NAP, async (ctx) => {
 bot.hears(BTN_VIP, async (ctx) => {
     let text = formatHeader('👑 BẢNG GIÁ VIP 👑') +
            `Mua gói VIP để mở khóa toàn bộ game:\n\n` +
-           `• 🎫 Gói 1 Ngày ── Giá: \`30.000đ\` ⚡\n` +
-           `• 🎫 Gói 3 Ngày ── Giá: \`55.000đ\` 🔥\n` +
-           `• 💎 Gói 7 Ngày ── Giá: \`90.000đ\` ✨\n` +
-           `• 👑 Vĩnh Viễn  ── Giá: \`250.000đ\` 🏆\n\n` +
+           `• 🎫 Gói 1 Ngày ── Giá: <code>30.000đ</code> ⚡\n` +
+           `• 🎫 Gói 3 Ngày ── Giá: <code>55.000đ</code> 🔥\n` +
+           `• 💎 Gói 7 Ngày ── Giá: <code>90.000đ</code> ✨\n` +
+           `• 👑 Vĩnh Viễn  ── Giá: <code>250.000đ</code> 🏆\n\n` +
            `👉 Bấm nút tương ứng bên dưới để mua:`;
-    await ctx.replyWithMarkdown(text, { reply_markup: vipMarkup() });
+    await ctx.replyWithHTML(text, { reply_markup: vipMarkup() });
 });
 
 bot.hears(BTN_USER, async (ctx) => {
@@ -212,12 +205,12 @@ bot.hears(BTN_USER, async (ctx) => {
     const vipInfo = checkVipStatus(ctx.from.id);
 
     let text = formatHeader('✨ THÔNG TIN TÀI KHOẢN ✨') +
-       `• 🆔 ID: \`${ctx.from.id}\`\n` +
-       `• 💰 Số dư: \`${u.balance.toLocaleString('vi-VN')}đ\`\n` +
-       `• 👑 Gói VIP: ${vipInfo.isVip ? '👑 VIP PRO' : 'Chưa đăng ký'}\n` +
+       `• 🆔 ID: <code>${ctx.from.id}</code>\n` +
+       `• 💰 Số dư: <code>${u.balance.toLocaleString('vi-VN')}đ</code>\n` +
+       `• 👑 Gói VIP: ${vipInfo.isVip ? '<b>👑 VIP PRO</b>' : 'Chưa đăng ký'}\n` +
        `• ⏳ Hạn dùng: ${vipInfo.text}` +
        formatFooter();
-    await ctx.replyWithMarkdown(text, { reply_markup: mainReplyMarkup() });
+    await ctx.replyWithHTML(text, { reply_markup: mainReplyMarkup() });
 });
 
 // --- ⚡ XỬ LÝ TOÀN BỘ SỰ KIỆN NÚT BẤM INLINE (CALLBACK_QUERY) ---
@@ -232,16 +225,15 @@ bot.on('callback_query', async (ctx) => {
         const parts = data.split('_');
         const targetUserId = parts[2];
         const amount = parseInt(parts[3]);
-
         // Tiến hành cộng tiền vào database của khách dựa trên tham số đã tách
         updateUserBalance(targetUserId, amount);
         
         // Cập nhật lại thanh trạng thái trên tin nhắn ảnh của Admin
-        await ctx.editMessageCaption(`✅ **DUYỆT CỘNG TIỀN THÀNH CÔNG**\n• Đã cộng **+${amount.toLocaleString('vi-VN')}đ** cho ID: \`${targetUserId}\`.`, { reply_markup: null }).catch(() => {});
+        await ctx.editMessageCaption(`✅ <b>DUYỆT CỘNG TIỀN THÀNH CÔNG</b>\n• Đã cộng <b>+${amount.toLocaleString('vi-VN')}đ</b> cho ID: <code>${targetUserId}</code>.`, { parse_mode: 'HTML', reply_markup: null }).catch(() => {});
         
         // Gửi thông báo trực tiếp cho khách hàng
         try {
-            await ctx.telegram.sendMessage(targetUserId, `🎉 **NẠP TIỀN THÀNH CÔNG** 🎉\n• Tài khoản của bạn được Admin cộng ví: **+${amount.toLocaleString('vi-VN')}đ**\n• Hệ thống đã tự động cập nhật số dư mới!`);
+            await ctx.telegram.sendMessage(targetUserId, `🎉 <b>NẠP TIỀN THÀNH CÔNG</b> 🎉\n• Tài khoản của bạn được Admin cộng ví: <b>+${amount.toLocaleString('vi-VN')}đ</b>\n• Hệ thống đã tự động cập nhật số dư mới!`, { parse_mode: 'HTML' });
         } catch (e) {}
 
         // Gửi biên lai thông báo lịch sử giao dịch về cho Admin
@@ -261,20 +253,20 @@ bot.on('callback_query', async (ctx) => {
         return ctx.answerCbQuery('✅ Đã duyệt tiền!', { show_alert: true });
     }
 
-    // ADMIN TỪ CHỐI BILL
+    // --- ADMIN TỪ CHỐI BILL ---
     if (data.startsWith('admin_decline_')) {
         if (ctx.from.id !== ADMIN_ID) return ctx.answerCbQuery('❌ Bạn không phải Admin!');
         const parts = data.split('_');
-        const targetUserId = parts[2]; // Lấy chính xác ID người dùng từ chuỗi callback
+        const targetUserId = parts[2]; // Lấy chính xác ID người dùng ở vị trí index 2
         
-        await ctx.editMessageCaption(`❌ **ĐÃ TỪ CHỐI BILL** cho ID: \`${targetUserId}\`.`, { reply_markup: null }).catch(() => {});
+        await ctx.editMessageCaption(`❌ <b>ĐÃ TỪ CHỐI BILL</b> cho ID: <code>${targetUserId}</code>.`, { parse_mode: 'HTML', reply_markup: null }).catch(() => {});
         try {
-            await ctx.telegram.sendMessage(targetUserId, `❌ **HÓA ĐƠN BỊ TỪ CHỐI** ❌\n• Admin không tìm thấy giao dịch. Vui lòng kiểm tra lại banking MoMo!`);
+            await ctx.telegram.sendMessage(targetUserId, `❌ <b>HÓA ĐƠN BỊ TỪ CHỐI</b> ❌\n• Admin không tìm thấy giao dịch. Vui lòng kiểm tra lại banking MoMo!`, { parse_mode: 'HTML' });
         } catch (e) {}
         return ctx.answerCbQuery('❌ Đã từ chối!', { show_alert: true });
     }
 
-    // USER CHỌN BÀN GAME INLINE (HỖ TRỢ TẤT CẢ 10 BÀN)
+    // --- USER CHỌN BÀN GAME INLINE (HỖ TRỢ TẤT CẢ 10 BÀN) ---
     if (data.startsWith('table_')) {
         const tableName = data.replace('table_', '').toUpperCase();
         const user = getUser(userId);
@@ -295,27 +287,25 @@ bot.on('callback_query', async (ctx) => {
 
                 const duDoan = tableData.du_doan === 'Banker' ? '🏦 NHÀ CÁI (BANKER)' : '👤 NHÀ CON (PLAYER)';
                 
-                // Khai báo biến cục bộ textInline riêng biệt tránh rò rỉ biến toàn cục
-                let textInline = `👑 DỰ ĐOÁN BACCARAT VIP 👑\n\n` +
-                                 `🎰 Bàn: ${tableData.ban}\n` +
-                                 `🎯 DỰ ĐOÁN: ${duDoan}\n` +
-                                 `📊 Độ tin cậy: ${tableData.do_tin_cay}\n` +
-                                 `🔥 Phiên hiện tại: ${tableData.phien_hien_tai}\n\n` +
-                                 `📜 ${tableData.ket_qua.slice(-30)}`;
+                let textInline = formatHeader('👑 DỰ ĐOÁN BACCARAT VIP 👑') +
+                                 `🎰 Bàn: <b>${tableData.ban}</b>\n` +
+                                 `🎯 DỰ ĐOÁN: <b>${duDoan}</b>\n` +
+                                 `📊 Độ tin cậy: <code>${tableData.do_tin_cay}</code>\n` +
+                                 `🔥 Phiên hiện tại: <code>${tableData.phien_hien_tai}</code>\n\n` +
+                                 `📜 Dây cầu: <code>${tableData.ket_qua.slice(-30)}</code>`;
 
                 const backToTable = Markup.inlineKeyboard([
                     [Markup.button.callback('🛑 DỪNG', 'stop_predict')],
                     [Markup.button.callback('↩️ Trở Lại Danh Sách', 'refresh_tables')]
                 ]).reply_markup;
                 
-                await ctx.reply(textInline, { reply_markup: backToTable }).catch(() => {});
+                await ctx.reply(textInline, { parse_mode: 'HTML', reply_markup: backToTable }).catch(() => {});
 
             } catch (err) {
                 console.error(err);
                 await ctx.answerCbQuery('❌ Lỗi kết nối API!', { show_alert: true });
             }
         } else {
-            // Nếu phát hiện không có VIP, xóa đăng ký theo dõi ngay lập tức để tránh lỗi gửi bài lung tung
             delete userSubscriptions[userId];
             await ctx.answerCbQuery(
                 `🔒 Bạn cần mua VIP để mở khóa Bàn ${tableName}!`,
@@ -330,23 +320,23 @@ bot.on('callback_query', async (ctx) => {
         const textStop =
             formatHeader('🎮 DANH SÁCH GAME 🎮') +
             `Vui lòng chọn bàn bạn muốn cài đặt Tool (Hỗ trợ 10 Bàn):\n` +
-            `• 👑 Yêu cầu cấp bậc: VIP PRO` +
+            `• 👑 Yêu cầu cấp bậc: <b>VIP PRO</b>` +
             formatFooter();
 
-        await ctx.replyWithMarkdown(textStop, { reply_markup: tableMarkup() }).catch(() => {});
+        await ctx.replyWithHTML(textStop, { reply_markup: tableMarkup() }).catch(() => {});
         return;
     }
     else if (data === 'refresh_tables') {
         const textRefresh =
             formatHeader('🎮 DANH SÁCH BÀN GAME 🎮') +
             `Vui lòng chọn bàn muốn xem dự đoán (Bàn 1-5 & C01-C05).\n` +
-            `• Yêu cầu cấp bậc: 👑 VIP PRO` +
+            `• Yêu cầu cấp bậc: 👑 <b>VIP PRO</b>` +
             formatFooter();
 
-        await ctx.replyWithMarkdown(textRefresh, { reply_markup: tableMarkup() }).catch(() => {});
+        await ctx.replyWithHTML(textRefresh, { reply_markup: tableMarkup() }).catch(() => {});
     }
 
-    // XỬ LÝ MUA GÓI VIP CỘNG DỒN THỜI GIAN THEO SỐ DƯ TÀI KHOẢN
+    // --- XỬ LÝ MUA GÓI VIP THEO SỐ DƯ TÀI KHOẢN ---
     else if (data.startsWith('buy_')) {
         const pack = data.replace('buy_', '');
         const prices = { '1d': 30000, '3d': 55000, '7d': 90000, 'vv': 250000 };
@@ -362,19 +352,19 @@ bot.on('callback_query', async (ctx) => {
             await ctx.answerCbQuery(`🎉 Mua thành công!`, { show_alert: true });
             
             let textUser = formatHeader('✨ THÔNG TIN TÀI KHOẢN ✨') +
-                           `• 🆔 ID: \`${userId}\`\n` +
-                           `• 💰 Số dư: \`${updatedUser.balance.toLocaleString('vi-VN')}đ\`\n` +
-                           `• 👑 Gói VIP: 👑 VIP PRO\n` +
+                           `• 🆔 ID: <code>${userId}</code>\n` +
+                           `• 💰 Số dư: <code>${updatedUser.balance.toLocaleString('vi-VN')}đ</code>\n` +
+                           `• 👑 Gói VIP: <b>👑 VIP PRO</b>\n` +
                            `• ⏳ Hạn dùng: ${newVipInfo.text}` + 
                            formatFooter();
-            await ctx.replyWithMarkdown(textUser, { reply_markup: mainReplyMarkup() });
+            await ctx.replyWithHTML(textUser, { reply_markup: mainReplyMarkup() });
         } else {
             await ctx.answerCbQuery(`❌ Thất bại! Bạn cần tối thiểu ${price.toLocaleString('vi-VN')}đ để mua gói này. Vui lòng nạp tiền!`, { show_alert: true });
         }
     }
 });
 
-// THÔNG BÁO KHI GỬI ẢNH PHOTO NGOÀI SCENE GIAO DỊCH
+// --- THÔNG BÁO KHI GỬI ẢNH PHOTO NGOÀI SCENE GIAO DỊCH ---
 bot.on('photo', async (ctx) => {
     await ctx.reply('⚠️ Vui lòng nhấn nút [💳 NẠP TIỀN] dưới bàn phím trước khi gửi ảnh bill.');
 });
@@ -386,9 +376,9 @@ async function checkNewSessions() {
         const tables = Array.isArray(res.data) ? res.data : (res.data.data || []);
 
         for (const table of tables) {
-            const tableKey = String(table.ban).toUpperCase(); // Đồng bộ ép kiểu chữ hoa tên bàn (Linh hoạt cả 1-5 và C01-C05)
+            const tableKey = String(table.ban).toUpperCase();
 
-            // Khởi tạo điểm mốc gốc ở lần chạy đầu tiên để không gửi lung tung tin nhắn cũ ván trước khi mở bot
+            // Khởi tạo điểm mốc gốc ở lần chạy đầu tiên để không gửi lung tung tin cũ ván trước khi mở bot
             if (!lastSessions[tableKey]) {
                 lastSessions[tableKey] = table.phien_hien_tai;
                 continue;
@@ -399,33 +389,32 @@ async function checkNewSessions() {
                 lastSessions[tableKey] = table.phien_hien_tai;
 
                 const duDoan = table.du_doan === 'Banker' ? '🏦 NHÀ CÁI (BANKER)' : '👤 NHÀ CON (PLAYER)';
-                const textNotify = `👑 DỰ ĐOÁN BACCARAT VIP 👑\n\n` +
-                                   `🎰 Bàn: ${table.ban}\n` +
-                                   `🎯 DỰ ĐOÁN: ${duDoan}\n` +
-                                   `📊 Độ tin cậy: ${table.do_tin_cay}\n` +
-                                   `🔥 Phiên hiện tại: ${table.phien_hien_tai}\n` +
-                                   `📜 ${table.ket_qua.slice(-30)}`;
+                const textNotify = formatHeader('👑 DỰ ĐOÁN BACCARAT VIP 👑') +
+                                   `🎰 Bàn: <b>${table.ban}</b>\n` +
+                                   `🎯 DỰ ĐOÁN: <b>${duDoan}</b>\n` +
+                                   `📊 Độ tin cậy: <code>${table.do_tin_cay}</code>\n` +
+                                   `🔥 Phiên hiện tại: <code>${table.phien_hien_tai}</code>\n` +
+                                   `📜 Dây cầu: <code>${table.ket_qua.slice(-30)}</code>`;
 
                 // Gửi cho người đang theo dõi đúng bàn
                 for (const userId in userSubscriptions) {
                     if (userSubscriptions[userId] === tableKey) {
                         
-                        // 🔥 LỚP KHÓA BẢO MẬT: Kiểm tra lại quyền hạn VIP thời gian thực trước khi bắn tin nhắn
+                        // KHÓA BẢO MẬT VIP THỜI GIAN THỰC
                         const userDb = getUser(userId);
                         const hasVipNow = userDb && userDb.is_vip && (userDb.vip_until === 'permanent' || userDb.vip_until > Date.now());
 
-                        // Nếu hết hạn VIP: Hủy đăng ký ngay, chặn đứng spam lung tung
                         if (!hasVipNow) {
                             delete userSubscriptions[userId];
                             try {
-                                await bot.telegram.sendMessage(userId, '🔒 **Gói VIP của bạn đã hết hạn.** Hệ thống đã tự động dừng gửi dự đoán.');
+                                await bot.telegram.sendMessage(userId, '🔒 <b>Gói VIP của bạn đã hết hạn.</b> Hệ thống đã tự động dừng gửi dự đoán.', { parse_mode: 'HTML' });
                             } catch (e) {}
-                            continue; // Bỏ qua user này, chuyển sang tài khoản kế tiếp trong vòng lặp
+                            continue;
                         }
 
-                        // Nếu ĐỦ ĐIỀU KIỆN VIP: Tiến hành đẩy kết quả phiên mới tinh kèm bàn phím inline điều hướng
                         try {
                             await bot.telegram.sendMessage(userId, textNotify, {
+                                parse_mode: 'HTML',
                                 reply_markup: Markup.inlineKeyboard([
                                     [Markup.button.callback('🛑 DỪNG', 'stop_predict')],
                                     [Markup.button.callback('🎮 CHỌN BÀN', 'refresh_tables')]
@@ -451,27 +440,28 @@ bot.launch().then(() => {
     console.log('🚀 Bot đã khởi chạy ở chế độ Polling!');
 });
 
-// ===== EXPRESS CHO RENDER (ĐÃ LÀM SẠCH LỖI LẶP CODE) =====
-const app = express(); 
+// ===== EXPRESS WEB TRẢ PORT ĐỂ RENDER KHÔNG CRASH =====
+const express = require('express');
+const app = express();
 
 app.get('/', (req, res) => {
-    res.send('Bot Telegram Online (Polling Mode)');
+    res.send('Bot Telegram Online');
 });
 
 const PORT = process.env.PORT || 3000;
 const URL_DONG_BO = process.env.RENDER_EXTERNAL_URL || '';
 
 app.listen(PORT, () => {
-    console.log(`Server Express chạy thành công ở cổng ${PORT}`);
+    console.log(`Server chạy cổng ${PORT}`);
     
-    // Tự động Ping hệ thống định kỳ chống Sleep Mode Free Tier trên Render
+    // Tự động Ping hệ thống định kỳ để duy trì trạng thái thức (Chống Sleep Mode Free Tier trên Render)
     if (URL_DONG_BO) {
         setInterval(async () => {
             try {
                 await axios.get(URL_DONG_BO);
-                console.log('🔄 Đã tự động re-ping giữ bot luôn thức 24/7.');
+                console.log('🔄 Đã ping giữ server hoạt động liên tục chống ngủ đông.');
             } catch (err) {
-                console.log('⚠️ Ping duy trì lỗi: ', err.message);
+                console.log('⚠️ Re-ping lỗi: ', err.message);
             }
         }, 5 * 60 * 1000); // Tự động ping mỗi 5 phút
     }
