@@ -1,14 +1,17 @@
 {
-  "name": "telegram-baccarat-bot",
+  "name": "bot-predict-baccarat",
   "version": "1.0.0",
-  "description": "Telegram VIP Bot",
+  "description": "Bot Telegram quản lý nạp tiền, VIP và dự đoán phiên game",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
   "dependencies": {
-    "axios": "^1.11.0",
-    "express": "^5.1.0",
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "axios": "^1.7.9",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
